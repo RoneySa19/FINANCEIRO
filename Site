@@ -1,0 +1,657 @@
+import React, { useState, useMemo, useEffect } from 'react';
+import { 
+  LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, AreaChart, Area 
+} from 'recharts';
+import { 
+  LayoutDashboard, ReceiptText, TrendingUp, PiggyBank, Plus, Wallet, 
+  ArrowUpCircle, ArrowDownCircle, Briefcase, User, Calendar, Target,
+  CheckCircle2, Clock, Trash2, ChevronLeft, ChevronRight, CalendarDays
+} from 'lucide-react';
+
+const generateMonthlyGastos = () => {
+  // Baseado na importação do Excel "MEUS GASTOS.xlsx"
+  const gastosRaw = [
+    { desc: 'Cartão Caixa', method: 'credit', category: 'personal', type: 'expense', values: {1: 252, 2: 252, 3: 252, 4: 252, 6: 455, 7: 252, 8: 252, 9: 252, 10: 252, 11: 252, 12: 252} },
+    { desc: 'Nubank Roney', method: 'credit', category: 'personal', type: 'expense', values: {1: 100, 2: 100, 3: 100, 4: 100, 7: 170, 8: 174, 9: 170, 10: 170, 11: 100, 12: 100} },
+    { desc: 'Aniversário Noah', method: 'pix', category: 'personal', type: 'expense', values: {6: 300, 10: 500} },
+    { desc: 'Celular e Seguro', method: 'debit', category: 'personal', type: 'expense', values: {1: 140, 2: 140, 3: 140, 4: 140, 6: 140, 7: 140, 8: 140, 9: 140, 10: 140, 11: 140, 12: 140} },
+    { desc: 'Cabelereiro', method: 'cash', category: 'personal', type: 'expense', values: {1: 80, 2: 80, 3: 80, 4: 80, 5: 80, 6: 80, 7: 80, 8: 80, 9: 80, 10: 80, 11: 80, 12: 80} },
+    { desc: 'Seguro Moto', method: 'pix', category: 'personal', type: 'expense', values: {1: 140, 2: 140, 3: 140, 4: 140, 6: 140, 7: 140, 8: 140, 9: 140, 10: 140, 11: 140, 12: 140} },
+    // Adicionando um salário/renda fictícia de R$3000 para manter o saldo positivo (Você pode alterar no app)
+    { desc: 'Renda Principal (Adicionado pelo App)', type: 'income', method: 'transfer', category: 'personal', values: {1: 3000, 2: 3000, 3: 3000, 4: 3000, 5: 3000, 6: 3000, 7: 3000, 8: 3000, 9: 3000, 10: 3000, 11: 3000, 12: 3000}}
+  ];
+
+  let idCounter = 1;
+  const transactions = [];
+  const currentYear = 2026; // Usando 2026 por base do sistema
+  const currentMonth = 5; // Assumindo Maio (Mês 5) para separar o que está pendente do que já foi pago
+
+  gastosRaw.forEach(item => {
+    Object.entries(item.values).forEach(([monthStr, amount]) => {
+      const month = parseInt(monthStr);
+      // Marca automaticamente os meses que já passaram como "Pagos" e meses futuros como "Pendentes"
+      const status = month <= currentMonth ? 'paid' : 'pending';
+      // Colocando as despesas ficticiamente pro dia 10 e salários pro dia 05
+      const day = item.type === 'income' ? '05' : '10'; 
+      const date = `${currentYear}-${String(month).padStart(2, '0')}-${day}`;
+      
+      transactions.push({
+        id: idCounter++,
+        date,
+        description: item.desc,
+        amount: parseFloat(amount),
+        type: item.type,
+        category: item.category,
+        method: item.method,
+        status: status
+      });
+    });
+  });
+
+  // Ordenar por data decrescente (mais recente primeiro)
+  return transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
+};
+
+const initialTransactions = generateMonthlyGastos();
+
+const initialGoals = [
+  { id: 1, name: 'Fundo de Emergência', target: 10000, current: 4500, color: 'bg-emerald-500' },
+  { id: 2, name: 'Capital de Giro', target: 5000, current: 3200, color: 'bg-blue-500' },
+  { id: 3, name: 'Viagem Férias', target: 8000, current: 1500, color: 'bg-purple-500' },
+];
+
+const Card = ({ children, className = '' }) => (
+  <div className={`bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden ${className}`}>
+    {children}
+  </div>
+);
+
+const formatCurrency = (value) => {
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+};
+
+export default function FinancasApp() {
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [transactions, setTransactions] = useState(initialTransactions);
+  const [goals, setGoals] = useState(initialGoals);
+
+  // Controle de Período (Mês/Ano)
+  const [currentPeriod, setCurrentPeriod] = useState('2026-05');
+
+  // Responsive state for sidebar
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  const toggleTransactionStatus = (id) => {
+    setTransactions(transactions.map(tx =>
+      tx.id === id ? { ...tx, status: tx.status === 'paid' ? 'pending' : 'paid' } : tx
+    ));
+  };
+
+  // Funções de navegação de meses
+  const handlePrevMonth = () => {
+    const [year, month] = currentPeriod.split('-');
+    const date = new Date(year, parseInt(month) - 2, 1);
+    setCurrentPeriod(`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`);
+  };
+
+  const handleNextMonth = () => {
+    const [year, month] = currentPeriod.split('-');
+    const date = new Date(year, parseInt(month), 1);
+    setCurrentPeriod(`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`);
+  };
+
+  const formatCurrentPeriod = () => {
+    const [year, month] = currentPeriod.split('-');
+    const date = new Date(year, parseInt(month) - 1, 1);
+    const monthName = date.toLocaleString('pt-BR', { month: 'long' });
+    return `${monthName.charAt(0).toUpperCase() + monthName.slice(1)} ${year}`;
+  };
+
+  // Filtra transações pelo mês selecionado
+  const currentMonthTransactions = useMemo(() => {
+    return transactions.filter(tx => tx.date.startsWith(currentPeriod));
+  }, [transactions, currentPeriod]);
+
+  const dashboardStats = useMemo(() => {
+    const today = new Date('2026-05-16').toISOString().split('T')[0]; // Using mocked current date
+    let totalIncome = 0;
+    let totalExpense = 0;
+    let businessIncome = 0;
+    let businessExpense = 0;
+    let dailyProfit = 0;
+    let pendingExpenses = 0;
+
+    // Agora iteramos apenas nas transações do mês atual
+    currentMonthTransactions.forEach(t => {
+      if (t.type === 'income') {
+        if (t.status === 'paid') {
+          totalIncome += t.amount;
+          if (t.category === 'business') businessIncome += t.amount;
+          if (t.date === today && t.category === 'business') dailyProfit += t.amount;
+        }
+      } else {
+        if (t.status === 'paid') {
+          totalExpense += t.amount;
+          if (t.category === 'business') businessExpense += t.amount;
+          if (t.date === today && t.category === 'business') dailyProfit -= t.amount;
+        } else if (t.status === 'pending') {
+          pendingExpenses += t.amount;
+        }
+      }
+    });
+
+    return {
+      balance: totalIncome - totalExpense,
+      totalIncome,
+      totalExpense,
+      businessProfit: businessIncome - businessExpense,
+      dailyProfit,
+      pendingExpenses
+    };
+  }, [currentMonthTransactions]);
+
+  const chartData = useMemo(() => {
+    // Group transactions by date for the chart
+    const grouped = currentMonthTransactions.reduce((acc, curr) => {
+      const date = curr.date.split('-').slice(1).join('/'); // MM/DD
+      if (!acc[date]) acc[date] = { date, receitas: 0, despesas: 0 };
+      if (curr.type === 'income') acc[date].receitas += curr.amount;
+      if (curr.type === 'expense') acc[date].despesas += curr.amount;
+      return acc;
+    }, {});
+    
+    return Object.values(grouped).sort((a, b) => a.date.localeCompare(b.date));
+  }, [currentMonthTransactions]);
+
+  const [retireParams, setRetireParams] = useState({
+    currentAge: 30,
+    targetAge: 50,
+    initialAmount: 15000,
+    monthlyContribution: 1000,
+    annualReturnRate: 8 // 8%
+  });
+
+  const [newTx, setNewTx] = useState({
+    description: '', amount: '', type: 'income', category: 'business', method: 'pix', date: '2026-05-16', status: 'paid', installments: 1
+  });
+
+  const handleDeleteTransaction = (id) => {
+    setTransactions(transactions.filter(tx => tx.id !== id));
+  };
+
+  const handleAddTransaction = (e) => {
+    e.preventDefault();
+    if (!newTx.description || !newTx.amount) return;
+    
+    const baseAmount = parseFloat(newTx.amount);
+    const installments = parseInt(newTx.installments) || 1;
+    
+    let newTransactions = [];
+
+    if (installments > 1) {
+      const installmentAmount = baseAmount / installments;
+      // Usamos meio-dia para evitar problemas de fuso horário que pulam a data para o dia anterior
+      const baseDate = new Date(newTx.date + 'T12:00:00'); 
+
+      for (let i = 1; i <= installments; i++) {
+        const nextDate = new Date(baseDate.getTime());
+        nextDate.setMonth(baseDate.getMonth() + (i - 1));
+
+        newTransactions.push({
+          ...newTx,
+          id: Date.now() + i, // ID único para cada parcela
+          description: `${newTx.description} (${i}/${installments})`,
+          amount: installmentAmount,
+          date: nextDate.toISOString().split('T')[0],
+          // As parcelas futuras entram como pendentes automaticamente
+          status: i === 1 ? newTx.status : 'pending'
+        });
+      }
+    } else {
+      newTransactions.push({
+        ...newTx,
+        id: Date.now(),
+        amount: baseAmount
+      });
+    }
+    
+    setTransactions(prev => [...newTransactions, ...prev].sort((a, b) => new Date(b.date) - new Date(a.date)));
+    setNewTx({ ...newTx, description: '', amount: '', status: 'paid', installments: 1 });
+  };
+
+  const renderMonthSelector = () => (
+    <div className="flex items-center justify-between bg-white px-3 py-1.5 rounded-lg shadow-sm border border-slate-200 w-full sm:w-64">
+      <button onClick={handlePrevMonth} className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors" title="Mês Anterior">
+        <ChevronLeft size={20} />
+      </button>
+      <div className="flex items-center gap-2 font-medium text-slate-700 text-sm">
+        <CalendarDays size={16} className="text-indigo-500" />
+        {formatCurrentPeriod()}
+      </div>
+      <button onClick={handleNextMonth} className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors" title="Próximo Mês">
+        <ChevronRight size={20} />
+      </button>
+    </div>
+  );
+
+  const renderDashboard = () => (
+    <div className="space-y-6 animate-in fade-in duration-300">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <h2 className="text-2xl font-bold text-slate-800">Visão Geral</h2>
+        {renderMonthSelector()}
+      </div>
+      
+      {/* Stat Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+        <Card className="p-5 border-l-4 border-l-indigo-500">
+          <div className="flex justify-between items-start">
+            <div>
+              <p className="text-sm text-slate-500 font-medium">Saldo Atual</p>
+              <h3 className="text-2xl font-bold text-slate-800 mt-1">{formatCurrency(dashboardStats.balance)}</h3>
+            </div>
+            <div className="p-2 bg-indigo-50 rounded-lg text-indigo-600"><Wallet size={24} /></div>
+          </div>
+        </Card>
+
+        <Card className="p-5 border-l-4 border-l-emerald-500">
+          <div className="flex justify-between items-start">
+            <div>
+              <p className="text-sm text-slate-500 font-medium">Receitas (Pagas)</p>
+              <h3 className="text-2xl font-bold text-emerald-600 mt-1">{formatCurrency(dashboardStats.totalIncome)}</h3>
+            </div>
+            <div className="p-2 bg-emerald-50 rounded-lg text-emerald-600"><ArrowUpCircle size={24} /></div>
+          </div>
+        </Card>
+
+        <Card className="p-5 border-l-4 border-l-red-500">
+          <div className="flex justify-between items-start">
+            <div>
+              <p className="text-sm text-slate-500 font-medium">Despesas (Pagas)</p>
+              <h3 className="text-2xl font-bold text-red-600 mt-1">{formatCurrency(dashboardStats.totalExpense)}</h3>
+            </div>
+            <div className="p-2 bg-red-50 rounded-lg text-red-600"><ArrowDownCircle size={24} /></div>
+          </div>
+        </Card>
+
+        <Card className="p-5 border-l-4 border-l-amber-500 bg-amber-50/30">
+          <div className="flex justify-between items-start">
+            <div>
+              <p className="text-sm text-slate-500 font-medium">Contas a Pagar</p>
+              <h3 className="text-2xl font-bold text-amber-600 mt-1">{formatCurrency(dashboardStats.pendingExpenses)}</h3>
+            </div>
+            <div className="p-2 bg-amber-100 rounded-lg text-amber-600"><Clock size={24} /></div>
+          </div>
+        </Card>
+
+        <Card className="p-5 border-l-4 border-l-blue-500 bg-blue-50/50">
+          <div className="flex justify-between items-start">
+            <div>
+              <p className="text-sm text-slate-500 font-medium">Lucro (Diário)</p>
+              <h3 className={`text-2xl font-bold mt-1 ${dashboardStats.dailyProfit >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
+                {formatCurrency(dashboardStats.dailyProfit)}
+              </h3>
+            </div>
+            <div className="p-2 bg-blue-100 rounded-lg text-blue-600"><TrendingUp size={24} /></div>
+          </div>
+        </Card>
+      </div>
+
+      {/* Charts */}
+      <Card className="p-6">
+        <h3 className="text-lg font-semibold text-slate-800 mb-6">Fluxo de Caixa ({formatCurrentPeriod()})</h3>
+        <div className="h-[300px] w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+              <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fill: '#64748b'}} />
+              <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b'}} tickFormatter={(val) => `R$${val}`} />
+              <RechartsTooltip cursor={{fill: '#f1f5f9'}} formatter={(value) => formatCurrency(value)} />
+              <Legend iconType="circle" />
+              <Bar dataKey="receitas" name="Receitas" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={40} />
+              <Bar dataKey="despesas" name="Despesas" fill="#ef4444" radius={[4, 4, 0, 0]} maxBarSize={40} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </Card>
+    </div>
+  );
+
+  const renderTransactions = () => (
+    <div className="space-y-6 animate-in fade-in duration-300">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <h2 className="text-2xl font-bold text-slate-800">Lançamentos</h2>
+        {renderMonthSelector()}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Form */}
+        <Card className="p-5 lg:col-span-1 h-fit">
+          <h3 className="font-semibold text-slate-800 mb-4 flex items-center gap-2">
+            <Plus size={18} /> Novo Lançamento
+          </h3>
+          <form onSubmit={handleAddTransaction} className="space-y-4">
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">Descrição</label>
+              <input required type="text" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm" placeholder="Ex: Venda Produto X" value={newTx.description} onChange={e => setNewTx({...newTx, description: e.target.value})} />
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-slate-500 mb-1">Valor Total</label>
+                <input required type="number" step="0.01" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm" placeholder="0.00" value={newTx.amount} onChange={e => setNewTx({...newTx, amount: e.target.value})} />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-500 mb-1">Parcelas</label>
+                <input required type="number" min="1" max="72" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm" value={newTx.installments} onChange={e => setNewTx({...newTx, installments: e.target.value})} />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-500 mb-1">Data (1ª parc.)</label>
+                <input required type="date" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm text-slate-700" value={newTx.date} onChange={e => setNewTx({...newTx, date: e.target.value})} />
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-slate-500 mb-1">Tipo</label>
+                <select className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm" value={newTx.type} onChange={e => setNewTx({...newTx, type: e.target.value})}>
+                  <option value="income">Receita</option>
+                  <option value="expense">Despesa</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-500 mb-1">Status</label>
+                <select className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm" value={newTx.status} onChange={e => setNewTx({...newTx, status: e.target.value})}>
+                  <option value="paid">Pago / Recebido</option>
+                  <option value="pending">Pendente</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-slate-500 mb-1">Categoria</label>
+                <select className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm" value={newTx.category} onChange={e => setNewTx({...newTx, category: e.target.value})}>
+                  <option value="business">Negócio</option>
+                  <option value="personal">Pessoal</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-500 mb-1">Método</label>
+                <select className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm" value={newTx.method} onChange={e => setNewTx({...newTx, method: e.target.value})}>
+                  <option value="pix">Pix</option>
+                  <option value="credit">Cartão Crédito</option>
+                  <option value="debit">Cartão Débito</option>
+                  <option value="transfer">Transferência</option>
+                  <option value="cash">Dinheiro</option>
+                </select>
+              </div>
+            </div>
+
+            <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 rounded-lg transition-colors text-sm mt-2">
+              Adicionar Lançamento
+            </button>
+          </form>
+        </Card>
+
+        {/* List */}
+        <Card className="lg:col-span-2 overflow-hidden flex flex-col">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider border-b border-slate-200">
+                  <th className="px-4 py-3 font-medium">Data</th>
+                  <th className="px-4 py-3 font-medium">Descrição</th>
+                  <th className="px-4 py-3 font-medium">Categoria</th>
+                  <th className="px-4 py-3 font-medium">Status</th>
+                  <th className="px-4 py-3 font-medium text-right">Valor</th>
+                  <th className="px-4 py-3 font-medium text-center">Ações</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100 text-sm">
+            {currentMonthTransactions.length === 0 && (
+              <tr>
+                <td colSpan="6" className="px-4 py-8 text-center text-slate-500 bg-slate-50/50">
+                  Nenhum lançamento encontrado neste mês.
+                </td>
+              </tr>
+            )}
+            {currentMonthTransactions.map(tx => (
+              <tr key={tx.id} className="hover:bg-slate-50 transition-colors">
+                <td className="px-4 py-3 text-slate-500 whitespace-nowrap">
+                      {tx.date.split('-').reverse().join('/')}
+                    </td>
+                    <td className="px-4 py-3">
+                      <p className="font-medium text-slate-800">{tx.description}</p>
+                      <span className="text-xs text-slate-400 capitalize">{tx.method}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${tx.category === 'business' ? 'bg-blue-50 text-blue-600' : 'bg-purple-50 text-purple-600'}`}>
+                        {tx.category === 'business' ? <Briefcase size={12}/> : <User size={12}/>}
+                        {tx.category === 'business' ? 'Negócio' : 'Pessoal'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <button 
+                        onClick={() => toggleTransactionStatus(tx.id)}
+                        className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-colors border ${
+                          tx.status === 'paid' 
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' 
+                            : 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100'
+                        }`}
+                      >
+                        {tx.status === 'paid' ? <CheckCircle2 size={14}/> : <Clock size={14}/>}
+                        {tx.status === 'paid' ? 'Pago' : 'Pendente'}
+                      </button>
+                    </td>
+                    <td className={`px-4 py-3 text-right font-medium whitespace-nowrap ${tx.type === 'income' ? 'text-emerald-600' : 'text-red-600'}`}>
+                      {tx.type === 'income' ? '+' : '-'}{formatCurrency(tx.amount)}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <button 
+                        type="button"
+                        onClick={() => handleDeleteTransaction(tx.id)}
+                        className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors"
+                        title="Excluir Lançamento"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      </div>
+    </div>
+  );
+
+  const renderRetirement = () => (
+    <div className="space-y-6 animate-in fade-in duration-300">
+      <div>
+        <h2 className="text-2xl font-bold text-slate-800">Simulador de Independência Financeira</h2>
+        <p className="text-slate-500 mt-1">Projete o impacto dos juros compostos para sua aposentadoria.</p>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        {/* Controls */}
+        <Card className="p-5 lg:col-span-1 space-y-4 h-fit">
+          <div>
+            <label className="block text-xs font-medium text-slate-500 mb-1">Idade Atual</label>
+            <input type="number" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" value={retireParams.currentAge} onChange={e => setRetireParams({...retireParams, currentAge: Number(e.target.value)})} />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-500 mb-1">Idade Alvo (Aposentadoria)</label>
+            <input type="number" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" value={retireParams.targetAge} onChange={e => setRetireParams({...retireParams, targetAge: Number(e.target.value)})} />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-500 mb-1">Patrimônio Inicial (R$)</label>
+            <input type="number" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" value={retireParams.initialAmount} onChange={e => setRetireParams({...retireParams, initialAmount: Number(e.target.value)})} />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-500 mb-1">Aporte Mensal (R$)</label>
+            <input type="number" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-indigo-50 border-indigo-200 focus:ring-indigo-500" value={retireParams.monthlyContribution} onChange={e => setRetireParams({...retireParams, monthlyContribution: Number(e.target.value)})} />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-500 mb-1">Rentabilidade Anual Esperada (%)</label>
+            <input type="number" step="0.1" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" value={retireParams.annualReturnRate} onChange={e => setRetireParams({...retireParams, annualReturnRate: Number(e.target.value)})} />
+          </div>
+        </Card>
+
+        {/* Chart */}
+        <Card className="p-6 lg:col-span-3 flex flex-col">
+          <div className="mb-6 flex justify-between items-end">
+            <div>
+              <p className="text-sm text-slate-500 font-medium">Patrimônio Projetado aos {retireParams.targetAge} anos</p>
+              <h3 className="text-3xl font-bold text-indigo-600 mt-1">
+                {formatCurrency(retirementData[retirementData.length - 1]?.patrimonio || 0)}
+              </h3>
+            </div>
+            <div className="text-right hidden sm:block">
+              <p className="text-xs text-slate-400">Juros sobre Juros</p>
+              <p className="text-sm font-medium text-slate-700">A mágica do tempo</p>
+            </div>
+          </div>
+          <div className="h-[350px] w-full mt-auto">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={retirementData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="colorPatrimonio" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                <XAxis dataKey="idade" axisLine={false} tickLine={false} tick={{fill: '#64748b'}} tickFormatter={(val) => `${val} anos`} />
+                <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b'}} tickFormatter={(val) => `R$${(val/1000).toFixed(0)}k`} />
+                <RechartsTooltip 
+                  cursor={{stroke: '#cbd5e1', strokeWidth: 1, strokeDasharray: '4 4'}} 
+                  formatter={(value) => formatCurrency(value)}
+                  labelFormatter={(label) => `Idade: ${label} anos`}
+                />
+                <Area type="monotone" dataKey="patrimonio" name="Patrimônio Total" stroke="#6366f1" strokeWidth={3} fillOpacity={1} fill="url(#colorPatrimonio)" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
+      </div>
+    </div>
+  );
+
+  const renderGoals = () => (
+    <div className="space-y-6 animate-in fade-in duration-300">
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-800">Caixinhas (Metas)</h2>
+          <p className="text-slate-500 mt-1">Acompanhe o progresso dos seus objetivos de curto e médio prazo.</p>
+        </div>
+        <button className="bg-indigo-600 hover:bg-indigo-700 text-white p-2 rounded-lg transition-colors flex items-center gap-2 text-sm font-medium">
+          <Plus size={18} /> <span className="hidden sm:inline">Nova Caixinha</span>
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {goals.map(goal => {
+          const progress = Math.min(100, Math.round((goal.current / goal.target) * 100));
+          return (
+            <Card key={goal.id} className="p-6">
+              <div className="flex justify-between items-start mb-4">
+                <div className={`p-3 rounded-xl text-white ${goal.color} shadow-sm`}>
+                  <Target size={24} />
+                </div>
+                <span className="text-2xl font-bold text-slate-800">{progress}%</span>
+              </div>
+              <h3 className="font-semibold text-lg text-slate-800">{goal.name}</h3>
+              
+              <div className="mt-4 mb-2 flex justify-between text-sm">
+                <span className="text-slate-500">Atual: <strong className="text-slate-800">{formatCurrency(goal.current)}</strong></span>
+                <span className="text-slate-500">Meta: {formatCurrency(goal.target)}</span>
+              </div>
+              
+              <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden">
+                <div 
+                  className={`h-3 rounded-full ${goal.color} transition-all duration-1000 ease-out`} 
+                  style={{ width: `${progress}%` }}
+                ></div>
+              </div>
+            </Card>
+          );
+        })}
+      </div>
+    </div>
+  );
+
+  const NavItem = ({ id, icon: Icon, label }) => (
+    <button
+      onClick={() => setActiveTab(id)}
+      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-medium text-sm
+        ${activeTab === id 
+          ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200' 
+          : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'}`}
+    >
+      <Icon size={20} />
+      <span>{label}</span>
+    </button>
+  );
+
+  return (
+    <div className="min-h-screen bg-slate-50/50 flex text-slate-900 font-sans">
+      
+      {/* Mobile Header & Menu Toggle */}
+      <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 z-50">
+        <div className="flex items-center gap-2 font-bold text-lg text-indigo-700">
+          <Wallet size={24} /> FinançasPro
+        </div>
+        <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 text-slate-500">
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
+        </button>
+      </div>
+
+      {/* Sidebar Navigation */}
+      <aside className={`
+        fixed inset-y-0 left-0 bg-white w-64 border-r border-slate-200 p-5 flex flex-col z-40 transition-transform duration-300
+        lg:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
+      `}>
+        <div className="hidden lg:flex items-center gap-2 font-bold text-xl text-indigo-700 px-2 mb-8 mt-2">
+          <Wallet size={28} /> FinançasPro
+        </div>
+        
+        <nav className="space-y-2 mt-16 lg:mt-0 flex-1">
+          <NavItem id="dashboard" icon={LayoutDashboard} label="Visão Geral" />
+          <NavItem id="transactions" icon={ReceiptText} label="Lançamentos" />
+          <NavItem id="retirement" icon={TrendingUp} label="Aposentadoria (FIRE)" />
+          <NavItem id="goals" icon={PiggyBank} label="Metas e Caixinhas" />
+        </nav>
+
+        <div className="mt-auto p-4 bg-slate-50 rounded-xl">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold">
+              U
+            </div>
+            <div className="overflow-hidden">
+              <p className="text-sm font-semibold truncate">Usuário Teste</p>
+              <p className="text-xs text-slate-500 truncate">Plano Premium</p>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      {/* Main Content Area */}
+      <main className="flex-1 lg:ml-64 p-4 lg:p-8 pt-20 lg:pt-8 min-h-screen">
+        <div className="max-w-6xl mx-auto">
+          {activeTab === 'dashboard' && renderDashboard()}
+          {activeTab === 'transactions' && renderTransactions()}
+          {activeTab === 'retirement' && renderRetirement()}
+          {activeTab === 'goals' && renderGoals()}
+        </div>
+      </main>
+
+      {/* Mobile Overlay */}
+      {isMobileMenuOpen && (
+        <div 
+          className="fixed inset-0 bg-black/20 z-30 lg:hidden backdrop-blur-sm"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
+    </div>
+  );
+}
