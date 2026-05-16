@@ -1,0 +1,28 @@
+.section-hidden { display: none !important; }
+body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
+
+/* Estilos de Scrollbar Personalizados */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+/* Menu Ativo Premium */
+.tab-active { 
+    background: linear-gradient(90deg, #eff6ff 0%, #ffffff 100%);
+    color: #2563eb !important; 
+    font-weight: 600; 
+    border-left: 4px solid #3b82f6; 
+    box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.02);
+}
+
+/* Animações Flutuantes */
+.hover-lift { transition: transform 0.2s ease, box-shadow 0.2s ease; }
+.hover-lift:hover { transform: translateY(-2px); box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1); }
+
+/* Toast Animação */
+@keyframes slideInUp {
+    from { transform: translateY(100%); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+.toast-animate { animation: slideInUp 0.3s ease forwards; }
