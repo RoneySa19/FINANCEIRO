@@ -2,7 +2,7 @@ function saveData() {
     localStorage.setItem('financas_app_data_v2', JSON.stringify(transactions));
 }
 
-// === NOVAS FUNCIONALIDADES DE BACKUP ===
+// === FUNCIONALIDADES DE BACKUP E DADOS ===
 
 function exportData() {
     const dataStr = JSON.stringify(transactions, null, 2);
@@ -20,6 +20,21 @@ function exportData() {
     showToast('Backup exportado com sucesso!', 'success');
 }
 
+// Nova função para processar o upload do ficheiro
+function handleImport(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        importData(e.target.result);
+    };
+    reader.readAsText(file);
+    
+    // Reseta o input para permitir importar o mesmo ficheiro duas vezes se necessário
+    event.target.value = '';
+}
+
 function importData(jsonString) {
     try {
         const parsed = JSON.parse(jsonString);
@@ -32,7 +47,7 @@ function importData(jsonString) {
             showToast('Formato de ficheiro inválido.', 'error');
         }
     } catch(e) {
-        showToast('Erro ao ler o ficheiro.', 'error');
+        showToast('Erro ao ler o ficheiro. Certifique-se que é um JSON válido.', 'error');
     }
 }
 
@@ -63,10 +78,7 @@ function generateExcelData() {
     raw.forEach(item => {
         Object.entries(item.vals).forEach(([m, val]) => {
             let monthIdx = parseInt(m) - 1;
-            // Inteligência: Marca como 'pago' apenas se o mês já tiver passado ou for o atual
             let status = (monthIdx <= mesAtualReal) ? 'paid' : 'pending'; 
-            
-            // Segurança: Gerador de ID único robusto
             let uniqueId = Date.now().toString() + Math.floor(Math.random() * 10000).toString();
             
             data.push({
@@ -75,7 +87,7 @@ function generateExcelData() {
                 amount: parseFloat(val),
                 type: item.type, 
                 month: monthIdx, 
-                year: 2026, 
+                year: new Date().getFullYear(), // Ajustado para o ano atual dinâmico
                 status: status
             });
         });
