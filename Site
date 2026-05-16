@@ -1,657 +1,316 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { 
-  LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, AreaChart, Area 
-} from 'recharts';
-import { 
-  LayoutDashboard, ReceiptText, TrendingUp, PiggyBank, Plus, Wallet, 
-  ArrowUpCircle, ArrowDownCircle, Briefcase, User, Calendar, Target,
-  CheckCircle2, Clock, Trash2, ChevronLeft, ChevronRight, CalendarDays
-} from 'lucide-react';
-
-const generateMonthlyGastos = () => {
-  // Baseado na importação do Excel "MEUS GASTOS.xlsx"
-  const gastosRaw = [
-    { desc: 'Cartão Caixa', method: 'credit', category: 'personal', type: 'expense', values: {1: 252, 2: 252, 3: 252, 4: 252, 6: 455, 7: 252, 8: 252, 9: 252, 10: 252, 11: 252, 12: 252} },
-    { desc: 'Nubank Roney', method: 'credit', category: 'personal', type: 'expense', values: {1: 100, 2: 100, 3: 100, 4: 100, 7: 170, 8: 174, 9: 170, 10: 170, 11: 100, 12: 100} },
-    { desc: 'Aniversário Noah', method: 'pix', category: 'personal', type: 'expense', values: {6: 300, 10: 500} },
-    { desc: 'Celular e Seguro', method: 'debit', category: 'personal', type: 'expense', values: {1: 140, 2: 140, 3: 140, 4: 140, 6: 140, 7: 140, 8: 140, 9: 140, 10: 140, 11: 140, 12: 140} },
-    { desc: 'Cabelereiro', method: 'cash', category: 'personal', type: 'expense', values: {1: 80, 2: 80, 3: 80, 4: 80, 5: 80, 6: 80, 7: 80, 8: 80, 9: 80, 10: 80, 11: 80, 12: 80} },
-    { desc: 'Seguro Moto', method: 'pix', category: 'personal', type: 'expense', values: {1: 140, 2: 140, 3: 140, 4: 140, 6: 140, 7: 140, 8: 140, 9: 140, 10: 140, 11: 140, 12: 140} },
-    // Adicionando um salário/renda fictícia de R$3000 para manter o saldo positivo (Você pode alterar no app)
-    { desc: 'Renda Principal (Adicionado pelo App)', type: 'income', method: 'transfer', category: 'personal', values: {1: 3000, 2: 3000, 3: 3000, 4: 3000, 5: 3000, 6: 3000, 7: 3000, 8: 3000, 9: 3000, 10: 3000, 11: 3000, 12: 3000}}
-  ];
-
-  let idCounter = 1;
-  const transactions = [];
-  const currentYear = 2026; // Usando 2026 por base do sistema
-  const currentMonth = 5; // Assumindo Maio (Mês 5) para separar o que está pendente do que já foi pago
-
-  gastosRaw.forEach(item => {
-    Object.entries(item.values).forEach(([monthStr, amount]) => {
-      const month = parseInt(monthStr);
-      // Marca automaticamente os meses que já passaram como "Pagos" e meses futuros como "Pendentes"
-      const status = month <= currentMonth ? 'paid' : 'pending';
-      // Colocando as despesas ficticiamente pro dia 10 e salários pro dia 05
-      const day = item.type === 'income' ? '05' : '10'; 
-      const date = `${currentYear}-${String(month).padStart(2, '0')}-${day}`;
-      
-      transactions.push({
-        id: idCounter++,
-        date,
-        description: item.desc,
-        amount: parseFloat(amount),
-        type: item.type,
-        category: item.category,
-        method: item.method,
-        status: status
-      });
-    });
-  });
-
-  // Ordenar por data decrescente (mais recente primeiro)
-  return transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
-};
-
-const initialTransactions = generateMonthlyGastos();
-
-const initialGoals = [
-  { id: 1, name: 'Fundo de Emergência', target: 10000, current: 4500, color: 'bg-emerald-500' },
-  { id: 2, name: 'Capital de Giro', target: 5000, current: 3200, color: 'bg-blue-500' },
-  { id: 3, name: 'Viagem Férias', target: 8000, current: 1500, color: 'bg-purple-500' },
-];
-
-const Card = ({ children, className = '' }) => (
-  <div className={`bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden ${className}`}>
-    {children}
-  </div>
-);
-
-const formatCurrency = (value) => {
-  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
-};
-
-export default function FinancasApp() {
-  const [activeTab, setActiveTab] = useState('dashboard');
-  const [transactions, setTransactions] = useState(initialTransactions);
-  const [goals, setGoals] = useState(initialGoals);
-
-  // Controle de Período (Mês/Ano)
-  const [currentPeriod, setCurrentPeriod] = useState('2026-05');
-
-  // Responsive state for sidebar
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-
-  const toggleTransactionStatus = (id) => {
-    setTransactions(transactions.map(tx =>
-      tx.id === id ? { ...tx, status: tx.status === 'paid' ? 'pending' : 'paid' } : tx
-    ));
-  };
-
-  // Funções de navegação de meses
-  const handlePrevMonth = () => {
-    const [year, month] = currentPeriod.split('-');
-    const date = new Date(year, parseInt(month) - 2, 1);
-    setCurrentPeriod(`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`);
-  };
-
-  const handleNextMonth = () => {
-    const [year, month] = currentPeriod.split('-');
-    const date = new Date(year, parseInt(month), 1);
-    setCurrentPeriod(`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`);
-  };
-
-  const formatCurrentPeriod = () => {
-    const [year, month] = currentPeriod.split('-');
-    const date = new Date(year, parseInt(month) - 1, 1);
-    const monthName = date.toLocaleString('pt-BR', { month: 'long' });
-    return `${monthName.charAt(0).toUpperCase() + monthName.slice(1)} ${year}`;
-  };
-
-  // Filtra transações pelo mês selecionado
-  const currentMonthTransactions = useMemo(() => {
-    return transactions.filter(tx => tx.date.startsWith(currentPeriod));
-  }, [transactions, currentPeriod]);
-
-  const dashboardStats = useMemo(() => {
-    const today = new Date('2026-05-16').toISOString().split('T')[0]; // Using mocked current date
-    let totalIncome = 0;
-    let totalExpense = 0;
-    let businessIncome = 0;
-    let businessExpense = 0;
-    let dailyProfit = 0;
-    let pendingExpenses = 0;
-
-    // Agora iteramos apenas nas transações do mês atual
-    currentMonthTransactions.forEach(t => {
-      if (t.type === 'income') {
-        if (t.status === 'paid') {
-          totalIncome += t.amount;
-          if (t.category === 'business') businessIncome += t.amount;
-          if (t.date === today && t.category === 'business') dailyProfit += t.amount;
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Meu Controle Financeiro Premium</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Google Fonts: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: { brand: { 50: '#eff6ff', 100: '#dbeafe', 500: '#3b82f6', 600: '#2563eb', 900: '#1e3a8a' } }
+                }
+            }
         }
-      } else {
-        if (t.status === 'paid') {
-          totalExpense += t.amount;
-          if (t.category === 'business') businessExpense += t.amount;
-          if (t.date === today && t.category === 'business') dailyProfit -= t.amount;
-        } else if (t.status === 'pending') {
-          pendingExpenses += t.amount;
-        }
-      }
-    });
-
-    return {
-      balance: totalIncome - totalExpense,
-      totalIncome,
-      totalExpense,
-      businessProfit: businessIncome - businessExpense,
-      dailyProfit,
-      pendingExpenses
-    };
-  }, [currentMonthTransactions]);
-
-  const chartData = useMemo(() => {
-    // Group transactions by date for the chart
-    const grouped = currentMonthTransactions.reduce((acc, curr) => {
-      const date = curr.date.split('-').slice(1).join('/'); // MM/DD
-      if (!acc[date]) acc[date] = { date, receitas: 0, despesas: 0 };
-      if (curr.type === 'income') acc[date].receitas += curr.amount;
-      if (curr.type === 'expense') acc[date].despesas += curr.amount;
-      return acc;
-    }, {});
+    </script>
     
-    return Object.values(grouped).sort((a, b) => a.date.localeCompare(b.date));
-  }, [currentMonthTransactions]);
+    <!-- CSS Externo -->
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="text-slate-800 antialiased flex h-screen overflow-hidden selection:bg-brand-500 selection:text-white">
 
-  const [retireParams, setRetireParams] = useState({
-    currentAge: 30,
-    targetAge: 50,
-    initialAmount: 15000,
-    monthlyContribution: 1000,
-    annualReturnRate: 8 // 8%
-  });
+    <!-- Notificações Toast -->
+    <div id="toastContainer" class="fixed bottom-6 right-6 z-50 flex flex-col gap-3"></div>
 
-  const [newTx, setNewTx] = useState({
-    description: '', amount: '', type: 'income', category: 'business', method: 'pix', date: '2026-05-16', status: 'paid', installments: 1
-  });
-
-  const handleDeleteTransaction = (id) => {
-    setTransactions(transactions.filter(tx => tx.id !== id));
-  };
-
-  const handleAddTransaction = (e) => {
-    e.preventDefault();
-    if (!newTx.description || !newTx.amount) return;
-    
-    const baseAmount = parseFloat(newTx.amount);
-    const installments = parseInt(newTx.installments) || 1;
-    
-    let newTransactions = [];
-
-    if (installments > 1) {
-      const installmentAmount = baseAmount / installments;
-      // Usamos meio-dia para evitar problemas de fuso horário que pulam a data para o dia anterior
-      const baseDate = new Date(newTx.date + 'T12:00:00'); 
-
-      for (let i = 1; i <= installments; i++) {
-        const nextDate = new Date(baseDate.getTime());
-        nextDate.setMonth(baseDate.getMonth() + (i - 1));
-
-        newTransactions.push({
-          ...newTx,
-          id: Date.now() + i, // ID único para cada parcela
-          description: `${newTx.description} (${i}/${installments})`,
-          amount: installmentAmount,
-          date: nextDate.toISOString().split('T')[0],
-          // As parcelas futuras entram como pendentes automaticamente
-          status: i === 1 ? newTx.status : 'pending'
-        });
-      }
-    } else {
-      newTransactions.push({
-        ...newTx,
-        id: Date.now(),
-        amount: baseAmount
-      });
-    }
-    
-    setTransactions(prev => [...newTransactions, ...prev].sort((a, b) => new Date(b.date) - new Date(a.date)));
-    setNewTx({ ...newTx, description: '', amount: '', status: 'paid', installments: 1 });
-  };
-
-  const renderMonthSelector = () => (
-    <div className="flex items-center justify-between bg-white px-3 py-1.5 rounded-lg shadow-sm border border-slate-200 w-full sm:w-64">
-      <button onClick={handlePrevMonth} className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors" title="Mês Anterior">
-        <ChevronLeft size={20} />
-      </button>
-      <div className="flex items-center gap-2 font-medium text-slate-700 text-sm">
-        <CalendarDays size={16} className="text-indigo-500" />
-        {formatCurrentPeriod()}
-      </div>
-      <button onClick={handleNextMonth} className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors" title="Próximo Mês">
-        <ChevronRight size={20} />
-      </button>
-    </div>
-  );
-
-  const renderDashboard = () => (
-    <div className="space-y-6 animate-in fade-in duration-300">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h2 className="text-2xl font-bold text-slate-800">Visão Geral</h2>
-        {renderMonthSelector()}
-      </div>
-      
-      {/* Stat Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-        <Card className="p-5 border-l-4 border-l-indigo-500">
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-sm text-slate-500 font-medium">Saldo Atual</p>
-              <h3 className="text-2xl font-bold text-slate-800 mt-1">{formatCurrency(dashboardStats.balance)}</h3>
+    <!-- Modal de Confirmação -->
+    <div id="deleteModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 hidden items-center justify-center transition-opacity">
+        <div class="bg-white rounded-2xl p-6 w-11/12 max-w-md shadow-2xl transform scale-100 transition-transform">
+            <div class="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto mb-4 text-xl">
+                <i class="fa-solid fa-triangle-exclamation"></i>
             </div>
-            <div className="p-2 bg-indigo-50 rounded-lg text-indigo-600"><Wallet size={24} /></div>
-          </div>
-        </Card>
-
-        <Card className="p-5 border-l-4 border-l-emerald-500">
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-sm text-slate-500 font-medium">Receitas (Pagas)</p>
-              <h3 className="text-2xl font-bold text-emerald-600 mt-1">{formatCurrency(dashboardStats.totalIncome)}</h3>
+            <h3 class="text-center text-lg font-bold text-slate-800 mb-2">Apagar Lançamento?</h3>
+            <p class="text-center text-slate-500 text-sm mb-6">Esta ação não pode ser desfeita. Tem a certeza que deseja remover este registo?</p>
+            <div class="flex gap-3">
+                <button onclick="closeDeleteModal()" class="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-medium hover:bg-slate-50 transition">Cancelar</button>
+                <button onclick="executeDelete()" class="flex-1 py-2.5 rounded-xl bg-red-600 text-white font-medium hover:bg-red-700 transition shadow-lg shadow-red-200">Sim, Apagar</button>
             </div>
-            <div className="p-2 bg-emerald-50 rounded-lg text-emerald-600"><ArrowUpCircle size={24} /></div>
-          </div>
-        </Card>
-
-        <Card className="p-5 border-l-4 border-l-red-500">
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-sm text-slate-500 font-medium">Despesas (Pagas)</p>
-              <h3 className="text-2xl font-bold text-red-600 mt-1">{formatCurrency(dashboardStats.totalExpense)}</h3>
-            </div>
-            <div className="p-2 bg-red-50 rounded-lg text-red-600"><ArrowDownCircle size={24} /></div>
-          </div>
-        </Card>
-
-        <Card className="p-5 border-l-4 border-l-amber-500 bg-amber-50/30">
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-sm text-slate-500 font-medium">Contas a Pagar</p>
-              <h3 className="text-2xl font-bold text-amber-600 mt-1">{formatCurrency(dashboardStats.pendingExpenses)}</h3>
-            </div>
-            <div className="p-2 bg-amber-100 rounded-lg text-amber-600"><Clock size={24} /></div>
-          </div>
-        </Card>
-
-        <Card className="p-5 border-l-4 border-l-blue-500 bg-blue-50/50">
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-sm text-slate-500 font-medium">Lucro (Diário)</p>
-              <h3 className={`text-2xl font-bold mt-1 ${dashboardStats.dailyProfit >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
-                {formatCurrency(dashboardStats.dailyProfit)}
-              </h3>
-            </div>
-            <div className="p-2 bg-blue-100 rounded-lg text-blue-600"><TrendingUp size={24} /></div>
-          </div>
-        </Card>
-      </div>
-
-      {/* Charts */}
-      <Card className="p-6">
-        <h3 className="text-lg font-semibold text-slate-800 mb-6">Fluxo de Caixa ({formatCurrentPeriod()})</h3>
-        <div className="h-[300px] w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-              <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fill: '#64748b'}} />
-              <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b'}} tickFormatter={(val) => `R$${val}`} />
-              <RechartsTooltip cursor={{fill: '#f1f5f9'}} formatter={(value) => formatCurrency(value)} />
-              <Legend iconType="circle" />
-              <Bar dataKey="receitas" name="Receitas" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={40} />
-              <Bar dataKey="despesas" name="Despesas" fill="#ef4444" radius={[4, 4, 0, 0]} maxBarSize={40} />
-            </BarChart>
-          </ResponsiveContainer>
         </div>
-      </Card>
     </div>
-  );
 
-  const renderTransactions = () => (
-    <div className="space-y-6 animate-in fade-in duration-300">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h2 className="text-2xl font-bold text-slate-800">Lançamentos</h2>
-        {renderMonthSelector()}
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Form */}
-        <Card className="p-5 lg:col-span-1 h-fit">
-          <h3 className="font-semibold text-slate-800 mb-4 flex items-center gap-2">
-            <Plus size={18} /> Novo Lançamento
-          </h3>
-          <form onSubmit={handleAddTransaction} className="space-y-4">
-            <div>
-              <label className="block text-xs font-medium text-slate-500 mb-1">Descrição</label>
-              <input required type="text" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm" placeholder="Ex: Venda Produto X" value={newTx.description} onChange={e => setNewTx({...newTx, description: e.target.value})} />
-            </div>
-            <div className="grid grid-cols-3 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-slate-500 mb-1">Valor Total</label>
-                <input required type="number" step="0.01" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm" placeholder="0.00" value={newTx.amount} onChange={e => setNewTx({...newTx, amount: e.target.value})} />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-500 mb-1">Parcelas</label>
-                <input required type="number" min="1" max="72" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm" value={newTx.installments} onChange={e => setNewTx({...newTx, installments: e.target.value})} />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-500 mb-1">Data (1ª parc.)</label>
-                <input required type="date" className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm text-slate-700" value={newTx.date} onChange={e => setNewTx({...newTx, date: e.target.value})} />
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-slate-500 mb-1">Tipo</label>
-                <select className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm" value={newTx.type} onChange={e => setNewTx({...newTx, type: e.target.value})}>
-                  <option value="income">Receita</option>
-                  <option value="expense">Despesa</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-500 mb-1">Status</label>
-                <select className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm" value={newTx.status} onChange={e => setNewTx({...newTx, status: e.target.value})}>
-                  <option value="paid">Pago / Recebido</option>
-                  <option value="pending">Pendente</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-slate-500 mb-1">Categoria</label>
-                <select className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm" value={newTx.category} onChange={e => setNewTx({...newTx, category: e.target.value})}>
-                  <option value="business">Negócio</option>
-                  <option value="personal">Pessoal</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-500 mb-1">Método</label>
-                <select className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm" value={newTx.method} onChange={e => setNewTx({...newTx, method: e.target.value})}>
-                  <option value="pix">Pix</option>
-                  <option value="credit">Cartão Crédito</option>
-                  <option value="debit">Cartão Débito</option>
-                  <option value="transfer">Transferência</option>
-                  <option value="cash">Dinheiro</option>
-                </select>
-              </div>
-            </div>
-
-            <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 rounded-lg transition-colors text-sm mt-2">
-              Adicionar Lançamento
-            </button>
-          </form>
-        </Card>
-
-        {/* List */}
-        <Card className="lg:col-span-2 overflow-hidden flex flex-col">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider border-b border-slate-200">
-                  <th className="px-4 py-3 font-medium">Data</th>
-                  <th className="px-4 py-3 font-medium">Descrição</th>
-                  <th className="px-4 py-3 font-medium">Categoria</th>
-                  <th className="px-4 py-3 font-medium">Status</th>
-                  <th className="px-4 py-3 font-medium text-right">Valor</th>
-                  <th className="px-4 py-3 font-medium text-center">Ações</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100 text-sm">
-            {currentMonthTransactions.length === 0 && (
-              <tr>
-                <td colSpan="6" className="px-4 py-8 text-center text-slate-500 bg-slate-50/50">
-                  Nenhum lançamento encontrado neste mês.
-                </td>
-              </tr>
-            )}
-            {currentMonthTransactions.map(tx => (
-              <tr key={tx.id} className="hover:bg-slate-50 transition-colors">
-                <td className="px-4 py-3 text-slate-500 whitespace-nowrap">
-                      {tx.date.split('-').reverse().join('/')}
-                    </td>
-                    <td className="px-4 py-3">
-                      <p className="font-medium text-slate-800">{tx.description}</p>
-                      <span className="text-xs text-slate-400 capitalize">{tx.method}</span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${tx.category === 'business' ? 'bg-blue-50 text-blue-600' : 'bg-purple-50 text-purple-600'}`}>
-                        {tx.category === 'business' ? <Briefcase size={12}/> : <User size={12}/>}
-                        {tx.category === 'business' ? 'Negócio' : 'Pessoal'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <button 
-                        onClick={() => toggleTransactionStatus(tx.id)}
-                        className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-colors border ${
-                          tx.status === 'paid' 
-                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' 
-                            : 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100'
-                        }`}
-                      >
-                        {tx.status === 'paid' ? <CheckCircle2 size={14}/> : <Clock size={14}/>}
-                        {tx.status === 'paid' ? 'Pago' : 'Pendente'}
-                      </button>
-                    </td>
-                    <td className={`px-4 py-3 text-right font-medium whitespace-nowrap ${tx.type === 'income' ? 'text-emerald-600' : 'text-red-600'}`}>
-                      {tx.type === 'income' ? '+' : '-'}{formatCurrency(tx.amount)}
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <button 
-                        type="button"
-                        onClick={() => handleDeleteTransaction(tx.id)}
-                        className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors"
-                        title="Excluir Lançamento"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Card>
-      </div>
-    </div>
-  );
-
-  const renderRetirement = () => (
-    <div className="space-y-6 animate-in fade-in duration-300">
-      <div>
-        <h2 className="text-2xl font-bold text-slate-800">Simulador de Independência Financeira</h2>
-        <p className="text-slate-500 mt-1">Projete o impacto dos juros compostos para sua aposentadoria.</p>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Controls */}
-        <Card className="p-5 lg:col-span-1 space-y-4 h-fit">
-          <div>
-            <label className="block text-xs font-medium text-slate-500 mb-1">Idade Atual</label>
-            <input type="number" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" value={retireParams.currentAge} onChange={e => setRetireParams({...retireParams, currentAge: Number(e.target.value)})} />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-slate-500 mb-1">Idade Alvo (Aposentadoria)</label>
-            <input type="number" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" value={retireParams.targetAge} onChange={e => setRetireParams({...retireParams, targetAge: Number(e.target.value)})} />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-slate-500 mb-1">Patrimônio Inicial (R$)</label>
-            <input type="number" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" value={retireParams.initialAmount} onChange={e => setRetireParams({...retireParams, initialAmount: Number(e.target.value)})} />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-slate-500 mb-1">Aporte Mensal (R$)</label>
-            <input type="number" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-indigo-50 border-indigo-200 focus:ring-indigo-500" value={retireParams.monthlyContribution} onChange={e => setRetireParams({...retireParams, monthlyContribution: Number(e.target.value)})} />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-slate-500 mb-1">Rentabilidade Anual Esperada (%)</label>
-            <input type="number" step="0.1" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm" value={retireParams.annualReturnRate} onChange={e => setRetireParams({...retireParams, annualReturnRate: Number(e.target.value)})} />
-          </div>
-        </Card>
-
-        {/* Chart */}
-        <Card className="p-6 lg:col-span-3 flex flex-col">
-          <div className="mb-6 flex justify-between items-end">
-            <div>
-              <p className="text-sm text-slate-500 font-medium">Patrimônio Projetado aos {retireParams.targetAge} anos</p>
-              <h3 className="text-3xl font-bold text-indigo-600 mt-1">
-                {formatCurrency(retirementData[retirementData.length - 1]?.patrimonio || 0)}
-              </h3>
-            </div>
-            <div className="text-right hidden sm:block">
-              <p className="text-xs text-slate-400">Juros sobre Juros</p>
-              <p className="text-sm font-medium text-slate-700">A mágica do tempo</p>
-            </div>
-          </div>
-          <div className="h-[350px] w-full mt-auto">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={retirementData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="colorPatrimonio" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                <XAxis dataKey="idade" axisLine={false} tickLine={false} tick={{fill: '#64748b'}} tickFormatter={(val) => `${val} anos`} />
-                <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b'}} tickFormatter={(val) => `R$${(val/1000).toFixed(0)}k`} />
-                <RechartsTooltip 
-                  cursor={{stroke: '#cbd5e1', strokeWidth: 1, strokeDasharray: '4 4'}} 
-                  formatter={(value) => formatCurrency(value)}
-                  labelFormatter={(label) => `Idade: ${label} anos`}
-                />
-                <Area type="monotone" dataKey="patrimonio" name="Patrimônio Total" stroke="#6366f1" strokeWidth={3} fillOpacity={1} fill="url(#colorPatrimonio)" />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </Card>
-      </div>
-    </div>
-  );
-
-  const renderGoals = () => (
-    <div className="space-y-6 animate-in fade-in duration-300">
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-800">Caixinhas (Metas)</h2>
-          <p className="text-slate-500 mt-1">Acompanhe o progresso dos seus objetivos de curto e médio prazo.</p>
-        </div>
-        <button className="bg-indigo-600 hover:bg-indigo-700 text-white p-2 rounded-lg transition-colors flex items-center gap-2 text-sm font-medium">
-          <Plus size={18} /> <span className="hidden sm:inline">Nova Caixinha</span>
-        </button>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {goals.map(goal => {
-          const progress = Math.min(100, Math.round((goal.current / goal.target) * 100));
-          return (
-            <Card key={goal.id} className="p-6">
-              <div className="flex justify-between items-start mb-4">
-                <div className={`p-3 rounded-xl text-white ${goal.color} shadow-sm`}>
-                  <Target size={24} />
+    <!-- Menu Lateral -->
+    <div id="sidebar" class="bg-white/80 backdrop-blur-xl w-72 h-full border-r border-slate-200/60 flex flex-col absolute z-40 transform -translate-x-full transition-transform duration-300 md:relative md:translate-x-0">
+        <div class="p-6 flex justify-between items-center border-b border-slate-100">
+            <div class="flex items-center gap-3">
+                <div class="bg-gradient-to-br from-brand-500 to-brand-600 text-white w-10 h-10 rounded-xl flex items-center justify-center shadow-lg shadow-brand-200">
+                    <i class="fa-solid fa-wallet text-lg"></i>
                 </div>
-                <span className="text-2xl font-bold text-slate-800">{progress}%</span>
-              </div>
-              <h3 className="font-semibold text-lg text-slate-800">{goal.name}</h3>
-              
-              <div className="mt-4 mb-2 flex justify-between text-sm">
-                <span className="text-slate-500">Atual: <strong className="text-slate-800">{formatCurrency(goal.current)}</strong></span>
-                <span className="text-slate-500">Meta: {formatCurrency(goal.target)}</span>
-              </div>
-              
-              <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden">
-                <div 
-                  className={`h-3 rounded-full ${goal.color} transition-all duration-1000 ease-out`} 
-                  style={{ width: `${progress}%` }}
-                ></div>
-              </div>
-            </Card>
-          );
-        })}
-      </div>
-    </div>
-  );
-
-  const NavItem = ({ id, icon: Icon, label }) => (
-    <button
-      onClick={() => setActiveTab(id)}
-      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-medium text-sm
-        ${activeTab === id 
-          ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200' 
-          : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'}`}
-    >
-      <Icon size={20} />
-      <span>{label}</span>
-    </button>
-  );
-
-  return (
-    <div className="min-h-screen bg-slate-50/50 flex text-slate-900 font-sans">
-      
-      {/* Mobile Header & Menu Toggle */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 z-50">
-        <div className="flex items-center gap-2 font-bold text-lg text-indigo-700">
-          <Wallet size={24} /> FinançasPro
+                <h1 class="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-slate-800 to-slate-600">Finanças</h1>
+            </div>
+            <button onclick="toggleMenu()" class="md:hidden text-slate-400 hover:text-slate-600 text-2xl transition"><i class="fa-solid fa-xmark"></i></button>
         </div>
-        <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 text-slate-500">
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
-        </button>
-      </div>
 
-      {/* Sidebar Navigation */}
-      <aside className={`
-        fixed inset-y-0 left-0 bg-white w-64 border-r border-slate-200 p-5 flex flex-col z-40 transition-transform duration-300
-        lg:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
-      `}>
-        <div className="hidden lg:flex items-center gap-2 font-bold text-xl text-indigo-700 px-2 mb-8 mt-2">
-          <Wallet size={28} /> FinançasPro
-        </div>
-        
-        <nav className="space-y-2 mt-16 lg:mt-0 flex-1">
-          <NavItem id="dashboard" icon={LayoutDashboard} label="Visão Geral" />
-          <NavItem id="transactions" icon={ReceiptText} label="Lançamentos" />
-          <NavItem id="retirement" icon={TrendingUp} label="Aposentadoria (FIRE)" />
-          <NavItem id="goals" icon={PiggyBank} label="Metas e Caixinhas" />
+        <nav class="flex-1 overflow-y-auto py-4">
+            <div class="px-4 space-y-1.5">
+                <button onclick="switchTab('dashboard', this)" class="menu-btn tab-active w-full text-left px-4 py-3 rounded-xl text-slate-500 hover:bg-slate-50 flex items-center gap-3 transition-all duration-200 group">
+                    <i class="fa-solid fa-chart-pie text-lg group-hover:scale-110 transition-transform"></i> <span class="font-medium">Visão Geral</span>
+                </button>
+                <button onclick="switchTab('lancamentos', this)" class="menu-btn w-full text-left px-4 py-3 rounded-xl text-slate-500 hover:bg-slate-50 flex items-center gap-3 transition-all duration-200 group">
+                    <i class="fa-solid fa-list-ul text-lg group-hover:scale-110 transition-transform"></i> <span class="font-medium">Lançamentos</span>
+                </button>
+                <button onclick="switchTab('simulador', this)" class="menu-btn w-full text-left px-4 py-3 rounded-xl text-slate-500 hover:bg-slate-50 flex items-center gap-3 transition-all duration-200 group">
+                    <i class="fa-solid fa-arrow-trend-up text-lg group-hover:scale-110 transition-transform"></i> <span class="font-medium">Aposentadoria</span>
+                </button>
+                <button onclick="switchTab('metas', this)" class="menu-btn w-full text-left px-4 py-3 rounded-xl text-slate-500 hover:bg-slate-50 flex items-center gap-3 transition-all duration-200 group">
+                    <i class="fa-solid fa-bullseye text-lg group-hover:scale-110 transition-transform"></i> <span class="font-medium">Metas</span>
+                </button>
+            </div>
+
+            <!-- NOVOS BOTÕES DE BACKUP E DADOS -->
+            <div class="px-4 mt-8 mb-2">
+                <p class="text-xs font-bold text-slate-400 uppercase tracking-wider px-2">Dados e Backup</p>
+            </div>
+            <div class="px-4 space-y-1.5">
+                <button onclick="exportData()" class="w-full text-left px-4 py-2 rounded-xl text-slate-500 hover:bg-slate-50 flex items-center gap-3 transition-all">
+                    <i class="fa-solid fa-download w-5 text-center text-brand-500"></i> <span class="font-medium text-sm">Guardar Backup</span>
+                </button>
+                <label class="w-full text-left px-4 py-2 rounded-xl text-slate-500 hover:bg-slate-50 flex items-center gap-3 transition-all cursor-pointer">
+                    <i class="fa-solid fa-upload w-5 text-center text-emerald-500"></i> <span class="font-medium text-sm">Importar Backup</span>
+                    <input type="file" accept=".json" class="hidden" onchange="handleImport(event)">
+                </label>
+                <button onclick="clearAllData()" class="w-full text-left px-4 py-2 rounded-xl text-slate-500 hover:bg-red-50 hover:text-red-600 flex items-center gap-3 transition-all">
+                    <i class="fa-solid fa-trash-can w-5 text-center text-red-400"></i> <span class="font-medium text-sm">Apagar Tudo</span>
+                </button>
+            </div>
         </nav>
-
-        <div className="mt-auto p-4 bg-slate-50 rounded-xl">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold">
-              U
-            </div>
-            <div className="overflow-hidden">
-              <p className="text-sm font-semibold truncate">Usuário Teste</p>
-              <p className="text-xs text-slate-500 truncate">Plano Premium</p>
-            </div>
-          </div>
+        
+        <div class="p-6 border-t border-slate-100 bg-slate-50">
+            <p class="text-xs text-slate-500 font-medium mb-1">Saldo Atual</p>
+            <h2 id="sideBalance" class="text-xl font-bold text-slate-800">R$ 0,00</h2>
         </div>
-      </aside>
-
-      {/* Main Content Area */}
-      <main className="flex-1 lg:ml-64 p-4 lg:p-8 pt-20 lg:pt-8 min-h-screen">
-        <div className="max-w-6xl mx-auto">
-          {activeTab === 'dashboard' && renderDashboard()}
-          {activeTab === 'transactions' && renderTransactions()}
-          {activeTab === 'retirement' && renderRetirement()}
-          {activeTab === 'goals' && renderGoals()}
-        </div>
-      </main>
-
-      {/* Mobile Overlay */}
-      {isMobileMenuOpen && (
-        <div 
-          className="fixed inset-0 bg-black/20 z-30 lg:hidden backdrop-blur-sm"
-          onClick={() => setIsMobileMenuOpen(false)}
-        />
-      )}
     </div>
-  );
-}
+
+    <!-- Fundo escuro para mobile -->
+    <div id="overlay" onclick="toggleMenu()" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-30 hidden md:hidden transition-opacity"></div>
+
+    <!-- Conteúdo Principal -->
+    <div class="flex-1 flex flex-col h-full w-full relative">
+        
+        <!-- Cabeçalho -->
+        <header class="bg-white/60 backdrop-blur-lg border-b border-slate-200/50 sticky top-0 z-20">
+            <div class="px-6 py-4 flex justify-between items-center">
+                <div class="flex items-center gap-4">
+                    <button onclick="toggleMenu()" class="md:hidden text-slate-500 hover:text-brand-600 text-2xl transition"><i class="fa-solid fa-bars-staggered"></i></button>
+                    <div>
+                        <h2 id="pageTitle" class="text-2xl font-bold text-slate-800 tracking-tight">Visão Geral</h2>
+                        <p id="greetingText" class="text-sm text-slate-500 hidden sm:block">Olá, bem-vindo de volta!</p>
+                    </div>
+                </div>
+                
+                <!-- Controlo de Mês -->
+                <div class="flex items-center bg-white border border-slate-200 rounded-xl p-1 shadow-sm">
+                    <button onclick="changeMonth(-1)" class="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition"><i class="fa-solid fa-chevron-left text-sm"></i></button>
+                    <span id="currentMonthDisplay" class="px-4 font-semibold text-sm w-36 text-center text-slate-700">Maio 2026</span>
+                    <button onclick="changeMonth(1)" class="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg transition"><i class="fa-solid fa-chevron-right text-sm"></i></button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Área de Scroll -->
+        <main class="flex-1 overflow-y-auto p-4 md:p-8 pb-24 scroll-smooth">
+
+            <!-- SEÇÃO: DASHBOARD -->
+            <section id="dashboard" class="max-w-7xl mx-auto">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    <!-- Card Saldo -->
+                    <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-200/60 hover-lift relative overflow-hidden group">
+                        <div class="absolute -right-6 -top-6 text-slate-50 opacity-50 transform group-hover:scale-110 transition-transform duration-500"><i class="fa-solid fa-wallet text-9xl"></i></div>
+                        <div class="relative z-10">
+                            <div class="flex justify-between items-start mb-4">
+                                <span class="text-slate-500 text-sm font-medium">Saldo (Pago)</span>
+                                <div class="w-10 h-10 rounded-full bg-brand-50 text-brand-600 flex items-center justify-center"><i class="fa-solid fa-wallet"></i></div>
+                            </div>
+                            <h3 id="dashSaldo" class="text-3xl font-bold text-slate-800 mb-1">R$ 0,00</h3>
+                            <div id="trendSaldo" class="text-xs font-medium flex items-center gap-1"></div>
+                        </div>
+                    </div>
+                    <!-- Card Receitas -->
+                    <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-200/60 hover-lift relative overflow-hidden group">
+                        <div class="absolute -right-6 -top-6 text-emerald-50 opacity-50 transform group-hover:scale-110 transition-transform duration-500"><i class="fa-solid fa-arrow-up-right-dots text-9xl"></i></div>
+                        <div class="relative z-10">
+                            <div class="flex justify-between items-start mb-4">
+                                <span class="text-slate-500 text-sm font-medium">Receitas</span>
+                                <div class="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center"><i class="fa-solid fa-arrow-down"></i></div>
+                            </div>
+                            <h3 id="dashReceitas" class="text-3xl font-bold text-slate-800 mb-1">R$ 0,00</h3>
+                            <div id="trendReceitas" class="text-xs font-medium flex items-center gap-1"></div>
+                        </div>
+                    </div>
+                    <!-- Card Despesas -->
+                    <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-200/60 hover-lift relative overflow-hidden group">
+                        <div class="absolute -right-6 -top-6 text-red-50 opacity-50 transform group-hover:scale-110 transition-transform duration-500"><i class="fa-solid fa-arrow-trend-down text-9xl"></i></div>
+                        <div class="relative z-10">
+                            <div class="flex justify-between items-start mb-4">
+                                <span class="text-slate-500 text-sm font-medium">Despesas Pagas</span>
+                                <div class="w-10 h-10 rounded-full bg-red-50 text-red-600 flex items-center justify-center"><i class="fa-solid fa-arrow-up"></i></div>
+                            </div>
+                            <h3 id="dashDespesas" class="text-3xl font-bold text-slate-800 mb-1">R$ 0,00</h3>
+                            <div id="trendDespesas" class="text-xs font-medium flex items-center gap-1"></div>
+                        </div>
+                    </div>
+                    <!-- Card Pendentes -->
+                    <div class="bg-gradient-to-br from-orange-50 to-white p-6 rounded-3xl shadow-sm border border-orange-100 hover-lift relative overflow-hidden group">
+                        <div class="absolute -right-4 -top-4 text-orange-100 opacity-50 transform group-hover:rotate-12 transition-transform duration-500"><i class="fa-regular fa-clock text-9xl"></i></div>
+                        <div class="relative z-10">
+                            <div class="flex justify-between items-start mb-4">
+                                <span class="text-orange-800 text-sm font-medium">Contas Pendentes</span>
+                                <div class="w-10 h-10 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center"><i class="fa-solid fa-stopwatch"></i></div>
+                            </div>
+                            <h3 id="dashPendentes" class="text-3xl font-bold text-orange-600 mb-1">R$ 0,00</h3>
+                            <p class="text-xs text-orange-600/70 font-medium">Aguardando pagamento</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-200/60 w-full mb-8">
+                    <h3 class="text-xl font-bold text-slate-800 mb-6">Análise de Fluxo</h3>
+                    <div class="relative h-80 w-full"><canvas id="dashboardChart"></canvas></div>
+                </div>
+            </section>
+
+            <!-- SEÇÃO: LANÇAMENTOS -->
+            <section id="lancamentos" class="section-hidden max-w-7xl mx-auto">
+                <div class="grid grid-cols-1 xl:grid-cols-3 gap-8">
+                    <div class="xl:col-span-1">
+                        <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-200/60 sticky top-24">
+                            <h3 class="font-bold text-xl text-slate-800 mb-6">Novo Lançamento</h3>
+                            <form id="formTransaction" class="space-y-4" onsubmit="addTransaction(event)">
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Descrição</label>
+                                    <input type="text" id="tDesc" required class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none" placeholder="Ex: Conta de Luz">
+                                </div>
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Valor (R$)</label>
+                                        <input type="number" id="tValue" step="0.01" required class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none" placeholder="0,00">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Parcelas</label>
+                                        <input type="number" id="tInstallments" min="1" max="48" value="1" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none text-center">
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Tipo de Movimento</label>
+                                    <div class="grid grid-cols-2 gap-2 bg-slate-100 p-1 rounded-xl">
+                                        <label class="cursor-pointer">
+                                            <input type="radio" name="tType" value="expense" checked class="peer sr-only">
+                                            <div class="text-center py-2 rounded-lg text-sm font-medium text-slate-500 peer-checked:bg-white peer-checked:text-red-600 peer-checked:shadow-sm">Despesa</div>
+                                        </label>
+                                        <label class="cursor-pointer">
+                                            <input type="radio" name="tType" value="income" class="peer sr-only">
+                                            <div class="text-center py-2 rounded-lg text-sm font-medium text-slate-500 peer-checked:bg-white peer-checked:text-emerald-600 peer-checked:shadow-sm">Receita</div>
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="pt-2">
+                                    <button type="submit" class="w-full bg-slate-800 text-white px-6 py-3.5 rounded-xl font-semibold hover:bg-slate-700 transition-all flex justify-center items-center gap-2">Registar</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    <div class="xl:col-span-2">
+                        <div class="bg-white rounded-3xl shadow-sm border border-slate-200/60 overflow-hidden flex flex-col h-full">
+                            <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-white">
+                                <h3 class="font-bold text-lg text-slate-800">Histórico do Mês</h3>
+                                <span class="bg-slate-100 text-slate-600 px-3 py-1 rounded-full text-xs font-semibold" id="txCount">0 Registos</span>
+                            </div>
+                            <div class="overflow-x-auto flex-1">
+                                <table class="w-full text-left text-sm whitespace-nowrap">
+                                    <thead class="bg-slate-50/50 text-slate-400 text-xs uppercase tracking-wider">
+                                        <tr>
+                                            <th class="p-4 font-medium">Descrição</th>
+                                            <th class="p-4 font-medium text-right">Valor</th>
+                                            <th class="p-4 font-medium text-center">Estado</th>
+                                            <th class="p-4 font-medium text-center">Ação</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="transactionsTableBody" class="divide-y divide-slate-100"></tbody>
+                                </table>
+                            </div>
+                            <div id="emptyState" class="p-12 text-center flex flex-col items-center justify-center hidden flex-1">
+                                <div class="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center text-slate-300 mb-4 text-3xl"><i class="fa-solid fa-file-invoice-dollar"></i></div>
+                                <h4 class="text-slate-800 font-bold text-lg">Sem movimentos</h4>
+                                <p class="text-slate-500 text-sm mt-1 max-w-xs">Ainda não há receitas ou despesas registadas neste mês.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SEÇÃO: SIMULADOR -->
+            <section id="simulador" class="section-hidden max-w-7xl mx-auto">
+                <div class="mb-8"><h2 class="text-2xl font-bold text-slate-800">Projeção de Independência</h2></div>
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                    <div class="lg:col-span-4 bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-slate-200/60">
+                        <div class="space-y-6">
+                            <div>
+                                <label class="block text-sm font-semibold text-slate-600 mb-2">Aporte Mensal (R$)</label>
+                                <input type="number" id="sAporte" value="500" oninput="calcRetirement()" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none font-semibold">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-semibold text-slate-600 mb-2">Rentabilidade Anual (%)</label>
+                                <input type="number" id="sTaxa" value="10" oninput="calcRetirement()" class="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-center font-semibold">
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-500 mb-2">Sua Idade</label>
+                                    <input type="number" id="sIdade" value="30" oninput="calcRetirement()" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-center font-semibold">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-500 mb-2">Aposentar aos</label>
+                                    <input type="number" id="sAposentadoria" value="50" oninput="calcRetirement()" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-center font-semibold">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="lg:col-span-8 bg-slate-900 rounded-3xl shadow-xl overflow-hidden flex flex-col p-8">
+                        <div class="mb-6">
+                            <h3 class="text-slate-400 font-medium text-sm mb-1">Património Acumulado</h3>
+                            <h2 id="sResultado" class="text-4xl md:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-indigo-300">R$ 0,00</h2>
+                        </div>
+                        <div class="w-full flex-1 relative min-h-[250px]"><canvas id="retirementChart"></canvas></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SEÇÃO: METAS -->
+            <section id="metas" class="section-hidden max-w-7xl mx-auto">
+                <div class="mb-8"><h2 class="text-2xl font-bold text-slate-800">Objetivos Financeiros</h2></div>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="goalsContainer"></div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- CÓDIGO JAVASCRIPT MODULARIZADO -->
+    <script src="js/state.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/storage.js"></script>
+    <script src="js/modules/dashboard.js"></script>
+    <script src="js/modules/transactions.js"></script>
+    <script src="js/modules/retirement.js"></script>
+    <script src="js/modules/goals.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
