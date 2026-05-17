@@ -1,0 +1,281 @@
+/**
+ * 🎨 Estilos de Temas (Light/Dark Mode)
+ */
+
+:root {
+  --color-primary: #3b82f6;
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-danger: #ef4444;
+  --color-info: #06b6d4;
+  
+  --bg-primary: #ffffff;
+  --bg-secondary: #f9fafb;
+  --bg-tertiary: #f3f4f6;
+  
+  --text-primary: #111827;
+  --text-secondary: #6b7280;
+  --text-tertiary: #d1d5db;
+  
+  --border-color: #e5e7eb;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
+  
+  --transition-duration: 0.3s;
+  --transition-timing: ease-in-out;
+}
+
+[data-theme="dark"],
+html.dark-mode {
+  --color-primary: #60a5fa;
+  --color-success: #34d399;
+  --color-warning: #fbbf24;
+  --color-danger: #f87171;
+  --color-info: #22d3ee;
+  
+  --bg-primary: #111827;
+  --bg-secondary: #1f2937;
+  --bg-tertiary: #374151;
+  
+  --text-primary: #f3f4f6;
+  --text-secondary: #d1d5db;
+  --text-tertiary: #9ca3af;
+  
+  --border-color: #4b5563;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.3);
+}
+
+/* Aplicar transições suaves */
+* {
+  transition: background-color var(--transition-duration) var(--transition-timing),
+              color var(--transition-duration) var(--transition-timing),
+              border-color var(--transition-duration) var(--transition-timing);
+}
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+a {
+  color: var(--color-primary);
+}
+
+a:hover {
+  color: var(--color-info);
+}
+
+/* Cards */
+.card,
+[class*="card"] {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-md);
+  color: var(--text-primary);
+}
+
+/* Inputs */
+input,
+textarea,
+select {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* Botões */
+.btn {
+  transition: all var(--transition-duration) var(--transition-timing);
+}
+
+.btn-primary {
+  background-color: var(--color-primary);
+  color: white;
+}
+
+.btn-success {
+  background-color: var(--color-success);
+  color: white;
+}
+
+.btn-danger {
+  background-color: var(--color-danger);
+  color: white;
+}
+
+.btn-warning {
+  background-color: var(--color-warning);
+  color: white;
+}
+
+/* Tabelas */
+table {
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+thead {
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+tbody tr:hover {
+  background-color: var(--bg-tertiary);
+}
+
+/* Botão de alternância de tema */
+.theme-toggle {
+  background: none;
+  border: 2px solid var(--color-primary);
+  color: var(--color-primary);
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-duration) var(--transition-timing);
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 1000;
+}
+
+.theme-toggle:hover {
+  background-color: var(--color-primary);
+  color: var(--bg-primary);
+  transform: scale(1.1);
+}
+
+/* Scrollbar customizada (Dark Mode) */
+html.dark-mode ::-webkit-scrollbar {
+  width: 10px;
+}
+
+html.dark-mode ::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+}
+
+html.dark-mode ::-webkit-scrollbar-thumb {
+  background: var(--bg-tertiary);
+  border-radius: 5px;
+}
+
+html.dark-mode ::-webkit-scrollbar-thumb:hover {
+  background: var(--border-color);
+}
+
+/* Placeholder text */
+::placeholder {
+  color: var(--text-tertiary);
+}
+
+/* Código */
+code,
+pre {
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}
+
+/* Badges */
+.badge {
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}
+
+.badge-primary {
+  background-color: var(--color-primary);
+  color: white;
+}
+
+.badge-success {
+  background-color: var(--color-success);
+  color: white;
+}
+
+.badge-danger {
+  background-color: var(--color-danger);
+  color: white;
+}
+
+/* Alertas */
+.alert {
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.alert-success {
+  border-color: var(--color-success);
+  background-color: rgba(16, 185, 129, 0.1);
+  color: var(--color-success);
+}
+
+.alert-danger {
+  border-color: var(--color-danger);
+  background-color: rgba(239, 68, 68, 0.1);
+  color: var(--color-danger);
+}
+
+.alert-warning {
+  border-color: var(--color-warning);
+  background-color: rgba(245, 158, 11, 0.1);
+  color: var(--color-warning);
+}
+
+/* Modais */
+.modal {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.modal-backdrop {
+  background-color: rgba(0, 0, 0, 0.5);
+}
+
+/* Separadores */
+hr {
+  border-color: var(--border-color);
+}
+
+/* Links */
+a {
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+a:visited {
+  color: var(--color-info);
+}
+
+/* Animações suaves para tema */
+@media (prefers-reduced-motion: no-preference) {
+  * {
+    transition: background-color var(--transition-duration) var(--transition-timing),
+                color var(--transition-duration) var(--transition-timing),
+                border-color var(--transition-duration) var(--transition-timing);
+  }
+}
+
+/* Print (sempre em light mode) */
+@media print {
+  * {
+    background-color: white !important;
+    color: black !important;
+    border-color: #000 !important;
+  }
+}
